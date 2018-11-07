@@ -67,9 +67,13 @@ int substr(char *dst,char *src, int len, int start){
 }
 
 //加密
-PHPAPI zend_string *php_des_encode(const unsigned char *str, size_t str_len){
+PHPAPI zend_string *php_des_encode(unsigned char *str, size_t str_len){
 	
+
+    int i = 0;
+
 	zend_string *result;
+    unsigned char *p;
 	
 	unsigned char* data_block = (unsigned char*) emalloc(8*sizeof(char));
 	unsigned char* processed_block = (unsigned char*) emalloc(8*sizeof(char));
@@ -86,23 +90,42 @@ PHPAPI zend_string *php_des_encode(const unsigned char *str, size_t str_len){
 	
 	//区块数量
 	number_of_blocks = str_len/8 + ((str_len%8)?1:0);
+
+    result = zend_string_safe_alloc(number_of_blocks, 8 * sizeof(char), 0, 0);
+
+    p = (unsigned char *)ZSTR_VAL(result);
+
 	
-	while(block_count > 0){
-		
+	while(block_count < number_of_blocks){
+		block_count ++;
 		substr(data_block, str, 8, block_count * 8);
 		
 		if (block_count == number_of_blocks){
 			//最后一块
-			padding = 8 - file_size%8;
+			padding = 8 - str_len%8;
 			if (padding < 8) { // Fill empty data block bytes with padding
 				memset((data_block + 8 - padding), (unsigned char)padding, padding);
 			}
 			process_message(data_block, processed_block, key_sets, ENCRYPTION_MODE);
-		}
-		block_count ++;
+		}else{
+            process_message(data_block, processed_block, key_sets, ENCRYPTION_MODE);
+        }
+
+        for (i= 0; i < 8; i++){
+            *p++ = processed_block[i];
+        }
 		
 	}
-	
+
+    *p = '\0';
+
+    efree(data_block);
+    efree(processed_block);
+    efree(key_sets);
+
+
+    ZSTR_LEN(result) = (p - (unsigned char *)ZSTR_VAL(result));
+	return result;
 }
    
    
@@ -111,37 +134,24 @@ PHPAPI zend_string *php_des_encode(const unsigned char *str, size_t str_len){
    Return a string to confirm that the module is compiled in */
 PHP_FUNCTION(wumashi_password_encode)
 {
-	char *arg = NULL;
-	size_t arg_len, len;
-	zend_string *strg;
-	zend_string *result;
+    char *str;
+    size_t str_len;
+    zend_string *result_des;
+    zend_string *result;
 
-	if (zend_parse_parameters(ZEND_NUM_ARGS(), "s", &arg, &arg_len) == FAILURE) {
-		return;
-	}
-	 
-	ZEND_PARSE_PARAMETERS_START(1, 1)
-		Z_PARAM_STRING(str, str_len)
-	ZEND_PARSE_PARAMETERS_END();
-	
-	
-	//des 加密
-	unsigned long block_count = 0, number_of_blocks;
-	//区块数量
-	number_of_blocks = str_len/8 + ((str_len%8)?1:0);
-	
+    ZEND_PARSE_PARAMETERS_START(1, 1)
+        Z_PARAM_STRING(str, str_len)
+    ZEND_PARSE_PARAMETERS_END();
 
-	strg = strpprintf(0, "wumashi_password_encode %s", arg);
-	
-	//base64
-	result = php_base64_encode((unsigned char*)str, str_len);
-	if (result != NULL) {
-		RETURN_STR(result);
-	} else {
-		RETURN_FALSE;
-	}
-	
-	RETURN_STR(strg);
+
+    result_des = php_des_encode((unsigned char*)str, str_len);
+
+    result = php_base64_encode((unsigned char*)result_des, strlen(result_des));
+    if (result != NULL) {
+        RETURN_STR(result);
+    } else {
+        RETURN_FALSE;
+    }
 }
 
 PHP_FUNCTION(wumashi_password_decode)
@@ -159,13 +169,7 @@ PHP_FUNCTION(wumashi_password_decode)
 	}
 
 	strg = strpprintf(0, "wumashi_password_encode %s", arg);
-	
-	result = php_base64_decode_ex((unsigned char*)str, str_len, strict);
-	if (result != NULL) {
-		RETURN_STR(result);
-	} else {
-		RETURN_FALSE;
-	}
+
 		
 	RETURN_STR(strg);
 }

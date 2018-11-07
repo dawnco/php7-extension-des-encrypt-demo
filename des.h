@@ -6,8 +6,8 @@
 
 //see https://github.com/tarequeh/DES/
 
-//√‹‘ø
-static const unsigned char DES_KEY[] = "12345678"
+//
+static const unsigned char DES_KEY[] = "12345678";
 
 typedef struct {
 	unsigned char k[8];
