@@ -77,5 +77,5 @@ if test "$PHP_WUMASHI_PASSWORD" != "no"; then
   dnl
   dnl PHP_SUBST(WUMASHI_PASSWORD_SHARED_LIBADD)
 
-  PHP_NEW_EXTENSION(wumashi_password, wumashi_password.c, $ext_shared,, -DZEND_ENABLE_STATIC_TSRMLS_CACHE=1)
+  PHP_NEW_EXTENSION(wumashi_password, wumashi_password.c des.c, $ext_shared,, -DZEND_ENABLE_STATIC_TSRMLS_CACHE=1)
 fi

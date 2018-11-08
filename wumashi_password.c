@@ -22,13 +22,14 @@
 #include "config.h"
 #endif
 
+#include <string.h>
+
 #include "php.h"
 #include "php_ini.h"
 #include "ext/standard/info.h"
 #include "php_wumashi_password.h"
 
 #include "des.h"
-#include "ext/standard/base64.h"
 
 /* If you declare any globals in php_wumashi_password.h uncomment this:
 ZEND_DECLARE_MODULE_GLOBALS(wumashi_password)
@@ -36,6 +37,10 @@ ZEND_DECLARE_MODULE_GLOBALS(wumashi_password)
 
 /* True global resources - no need for thread safety here */
 static int le_wumashi_password;
+
+
+static const unsigned char DES_KEY[] = "12345678";
+
 
 /* {{{ PHP_INI
  */
@@ -67,29 +72,33 @@ int substr(char *dst,char *src, int len, int start){
 }
 
 /**
- encode_str  已经加密的字符串
+* 加密
 */
-void wms_des_encode(unsigned char *encode_str, unsigned char *str, size_t str_len){
+PHPAPI zend_string *php_des_encode(unsigned char *str, size_t str_len){
 	
     int i = 0;
- 
-	
-	unsigned char* data_block = (unsigned char*) emalloc(8*sizeof(char));
-	unsigned char* processed_block = (unsigned char*) emalloc(8*sizeof(char));
-	key_set* key_sets = (key_set*)emalloc(17*sizeof(key_set));
-	
-	
-	
-	unsigned short int padding;
-	
-	generate_sub_keys((unsigned char *)DES_KEY, key_sets);
-	
-	//des 加密
+	//des 
 	unsigned long block_count = 0, number_of_blocks;
 	
 	//区块数量
 	number_of_blocks = str_len/8 + ((str_len%8)?1:0);
- 
+	
+	unsigned char* data_block = (unsigned char*) emalloc(8*sizeof(char));
+	unsigned char* processed_block = (unsigned char*) emalloc(8*sizeof(char));
+	key_set* key_sets = (key_set*)emalloc(17*sizeof(key_set));
+	 
+	unsigned short int padding;
+	
+	unsigned char *p;
+	zend_string *result;
+	
+	generate_sub_keys((unsigned char *)DES_KEY, key_sets);
+
+	result = zend_string_safe_alloc(number_of_blocks + 1, 8 * sizeof(char), 0, 0);
+	p = (unsigned char *)ZSTR_VAL(result);
+	
+	
+	
 	while(block_count < number_of_blocks){
 		block_count ++;
 		substr(data_block, str, 8, block_count * 8);
@@ -97,80 +106,157 @@ void wms_des_encode(unsigned char *encode_str, unsigned char *str, size_t str_le
 		if (block_count == number_of_blocks){
 			//最后一块
 			padding = 8 - str_len%8;
-			if (padding < 8) { // Fill empty data block bytes with padding
+			if (padding < 8) { // 填充区块 空的保留填充信息
 				memset((data_block + 8 - padding), (unsigned char)padding, padding);
 			}
 			process_message(data_block, processed_block, key_sets, ENCRYPTION_MODE);
+			
+			for (i= 0; i < 8; i++){
+				*p++ = processed_block[i];
+			}
+			
+			if (padding == 8) { // 添加格外的区块 保留填充信息
+				memset(data_block, (unsigned char)padding, 8);
+				process_message(data_block, processed_block, key_sets, ENCRYPTION_MODE);
+				
+				for (i= 0; i < 8; i++){
+					*p++ = processed_block[i];
+				}
+			
+			}
+			
 		}else{
+			
             process_message(data_block, processed_block, key_sets, ENCRYPTION_MODE);
+			
+			for (i= 0; i < 8; i++){
+				*p++ = processed_block[i];
+			}
+			
         }
 
-        for (i= 0; i < 8; i++){
-            *encode_str++ = processed_block[i];
-        }
+        
 		
+		memset(data_block, 0, 8);
 	}
 
-    *encode_str = '\0';
+    *p = '\0';
 
     efree(data_block);
     efree(processed_block);
     efree(key_sets);
+	
+	
+	ZSTR_LEN(result) = (p - (unsigned char *)ZSTR_VAL(result));
+
+	return result;
 
 }
    
-   
+
+// 解密
+PHPAPI zend_string *php_des_decode(unsigned char *str, size_t str_len){
+	    int i = 0;
+	//des 
+	unsigned long block_count = 0, number_of_blocks;
+	
+	//区块数量
+	number_of_blocks = str_len/8 + ((str_len%8)?1:0);
+	
+	unsigned char* data_block = (unsigned char*) emalloc(8*sizeof(char));
+	unsigned char* processed_block = (unsigned char*) emalloc(8*sizeof(char));
+	key_set* key_sets = (key_set*)emalloc(17*sizeof(key_set));
+	 
+	unsigned short int padding;
+	
+	unsigned char *p;
+	zend_string *result;
+	
+	generate_sub_keys((unsigned char *)DES_KEY, key_sets);
+
+	result = zend_string_safe_alloc(number_of_blocks + 1, 8 * sizeof(char), 0, 0);
+	p = (unsigned char *)ZSTR_VAL(result);
+	
+	
+	
+	while(block_count < number_of_blocks){
+		block_count ++;
+		substr(data_block, str, 8, block_count * 8);
+		
+		if (block_count == number_of_blocks){
+			//最后一块
+			process_message(data_block, processed_block, key_sets, DECRYPTION_MODE);
+			padding = processed_block[7];
+
+			//小于8 这个区域有填充
+			if (padding < 8) {
+				for (i= 0; i < 8 - padding; i++){
+					*p++ = processed_block[i];
+				}
+			}
+					
+			process_message(data_block, processed_block, key_sets, DECRYPTION_MODE);
+		}else{
+            process_message(data_block, processed_block, key_sets, DECRYPTION_MODE);
+			for (i= 0; i < 8; i++){
+				*p++ = processed_block[i];
+			}
+        }
+
+        
+		
+		memset(data_block, 0, 8);
+	}
+
+    *p = '\0';
+
+    efree(data_block);
+    efree(processed_block);
+    efree(key_sets);
+	
+	
+	ZSTR_LEN(result) = (p - (unsigned char *)ZSTR_VAL(result));
+
+	return result;
+}	
+
 /* Every user-visible function in PHP should document itself in the source */
 /* {{{ proto string confirm_wumashi_password_compiled(string arg)
    Return a string to confirm that the module is compiled in */
 PHP_FUNCTION(wumashi_password_encode)
 {
     char *str;
-    size_t str_len;
-	
-    zend_string *result;
-	
+	size_t str_len;
+	zend_string *result;
 
-    ZEND_PARSE_PARAMETERS_START(1, 1)
-        Z_PARAM_STRING(str, str_len)
-    ZEND_PARSE_PARAMETERS_END();
-	
-	int encode_length = str_len/8 + ((str_len%8)?1:0) ;
-	
-	unsigned char* encode_str = (unsigned char*) emalloc(encode_length*8*sizeof(char));
+	ZEND_PARSE_PARAMETERS_START(1, 1)
+		Z_PARAM_STRING(str, str_len)
+	ZEND_PARSE_PARAMETERS_END();
 
-
-    wms_des_encode(encode_str, str, str_len);
-
-    result = php_base64_encode(encode_str, encode_length);
-	
-	efree(encode_str);
-	
-    if (result != NULL) {
-        RETURN_STR(result);
-    } else {
-        RETURN_FALSE;
-    }
+	result = php_des_encode((unsigned char*)str, str_len);
+	if (result != NULL) {
+		RETURN_STR(result);
+	} else {
+		RETURN_FALSE;
+	}
 }
 
 PHP_FUNCTION(wumashi_password_decode)
 {
-	char *arg = NULL;
-	size_t arg_len, len;
-	zend_string *strg;
+	char *str;
+	size_t str_len;
 	zend_string *result;
-	
-	zend_bool strict = 0;
-	
-	
-	if (zend_parse_parameters(ZEND_NUM_ARGS(), "s", &arg, &arg_len) == FAILURE) {
-		return;
+
+	ZEND_PARSE_PARAMETERS_START(1, 2)
+		Z_PARAM_STRING(str, str_len)
+	ZEND_PARSE_PARAMETERS_END();
+
+	result = php_des_decode((unsigned char*)str, str_len);
+	if (result != NULL) {
+		RETURN_STR(result);
+	} else {
+		RETURN_FALSE;
 	}
-
-	strg = strpprintf(0, "wumashi_password_encode %s", arg);
-
-		
-	RETURN_STR(strg);
 }
 /* }}} */
 /* The previous line is meant for vim and emacs, so it can correctly fold and
@@ -259,21 +345,10 @@ const zend_function_entry wumashi_password_functions[] = {
 };
 /* }}} */
 
-
-//依赖其他扩展
-// https://blog.csdn.net/u013474436/article/details/79029538
-static const zend_module_dep wms_deps[] = {
-        ZEND_MOD_REQUIRED("standard")
-        ZEND_MOD_END
-};
-
-
 /* {{{ wumashi_password_module_entry
  */
 zend_module_entry wumashi_password_module_entry = {
-	//STANDARD_MODULE_HEADER,
-	STANDARD_MODULE_HEADER_EX, NULL,
-    wms_deps,
+	STANDARD_MODULE_HEADER,
 	"wumashi_password",
 	wumashi_password_functions,
 	PHP_MINIT(wumashi_password),
