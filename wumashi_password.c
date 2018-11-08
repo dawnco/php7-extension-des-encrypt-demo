@@ -66,14 +66,13 @@ int substr(char *dst,char *src, int len, int start){
   return len;
 }
 
-//加密
-PHPAPI zend_string *php_des_encode(unsigned char *str, size_t str_len){
+/**
+ encode_str  已经加密的字符串
+*/
+void wms_des_encode(unsigned char *encode_str, unsigned char *str, size_t str_len){
 	
-
     int i = 0;
-
-	zend_string *result;
-    unsigned char *p;
+ 
 	
 	unsigned char* data_block = (unsigned char*) emalloc(8*sizeof(char));
 	unsigned char* processed_block = (unsigned char*) emalloc(8*sizeof(char));
@@ -83,19 +82,14 @@ PHPAPI zend_string *php_des_encode(unsigned char *str, size_t str_len){
 	
 	unsigned short int padding;
 	
-	generate_sub_keys(DES_KEY, key_sets);
+	generate_sub_keys((unsigned char *)DES_KEY, key_sets);
 	
 	//des 加密
 	unsigned long block_count = 0, number_of_blocks;
 	
 	//区块数量
 	number_of_blocks = str_len/8 + ((str_len%8)?1:0);
-
-    result = zend_string_safe_alloc(number_of_blocks, 8 * sizeof(char), 0, 0);
-
-    p = (unsigned char *)ZSTR_VAL(result);
-
-	
+ 
 	while(block_count < number_of_blocks){
 		block_count ++;
 		substr(data_block, str, 8, block_count * 8);
@@ -112,20 +106,17 @@ PHPAPI zend_string *php_des_encode(unsigned char *str, size_t str_len){
         }
 
         for (i= 0; i < 8; i++){
-            *p++ = processed_block[i];
+            *encode_str++ = processed_block[i];
         }
 		
 	}
 
-    *p = '\0';
+    *encode_str = '\0';
 
     efree(data_block);
     efree(processed_block);
     efree(key_sets);
 
-
-    ZSTR_LEN(result) = (p - (unsigned char *)ZSTR_VAL(result));
-	return result;
 }
    
    
@@ -136,17 +127,25 @@ PHP_FUNCTION(wumashi_password_encode)
 {
     char *str;
     size_t str_len;
-    zend_string *result_des;
+	
     zend_string *result;
+	
 
     ZEND_PARSE_PARAMETERS_START(1, 1)
         Z_PARAM_STRING(str, str_len)
     ZEND_PARSE_PARAMETERS_END();
+	
+	int encode_length = str_len/8 + ((str_len%8)?1:0) ;
+	
+	unsigned char* encode_str = (unsigned char*) emalloc(encode_length*8*sizeof(char));
 
 
-    result_des = php_des_encode((unsigned char*)str, str_len);
+    wms_des_encode(encode_str, str, str_len);
 
-    result = php_base64_encode((unsigned char*)result_des, strlen(result_des));
+    result = php_base64_encode(encode_str, encode_length);
+	
+	efree(encode_str);
+	
     if (result != NULL) {
         RETURN_STR(result);
     } else {
@@ -260,10 +259,21 @@ const zend_function_entry wumashi_password_functions[] = {
 };
 /* }}} */
 
+
+//依赖其他扩展
+// https://blog.csdn.net/u013474436/article/details/79029538
+static const zend_module_dep wms_deps[] = {
+        ZEND_MOD_REQUIRED("standard")
+        ZEND_MOD_END
+};
+
+
 /* {{{ wumashi_password_module_entry
  */
 zend_module_entry wumashi_password_module_entry = {
-	STANDARD_MODULE_HEADER,
+	//STANDARD_MODULE_HEADER,
+	STANDARD_MODULE_HEADER_EX, NULL,
+    wms_deps,
 	"wumashi_password",
 	wumashi_password_functions,
 	PHP_MINIT(wumashi_password),
