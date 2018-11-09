@@ -16,5 +16,14 @@ static const unsigned char DES_KEY[] = "12345678";
 ```
 
 
-安装方式
+### 安装方式
+```
+phpize
+./configure
+make && make install
+```
+php.ini 里填加 添加扩展
+```
+extension=wumashi_password.so
+```
 
