@@ -109,8 +109,8 @@ PHPAPI zend_string *php_des_encode(unsigned char *str, size_t str_len){
 			if (padding < 8) { // 填充区块 空的保留填充信息
 				memset((data_block + 8 - padding), (unsigned char)padding, padding);
 			}
-			process_message(data_block, processed_block, key_sets, ENCRYPTION_MODE);
 			
+			process_message(data_block, processed_block, key_sets, ENCRYPTION_MODE);
 			for (i= 0; i < 8; i++){
 				*p++ = processed_block[i];
 			}
@@ -194,8 +194,7 @@ PHPAPI zend_string *php_des_decode(unsigned char *str, size_t str_len){
 					*p++ = processed_block[i];
 				}
 			}
-					
-			process_message(data_block, processed_block, key_sets, DECRYPTION_MODE);
+			
 		}else{
             process_message(data_block, processed_block, key_sets, DECRYPTION_MODE);
 			for (i= 0; i < 8; i++){
@@ -207,7 +206,8 @@ PHPAPI zend_string *php_des_decode(unsigned char *str, size_t str_len){
 		
 		memset(data_block, 0, 8);
 	}
-
+	
+	*p++ = 'A'; 
     *p = '\0';
 
     efree(data_block);
