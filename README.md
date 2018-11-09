@@ -6,3 +6,15 @@
 ```
   PHP_NEW_EXTENSION(wumashi_password, wumashi_password.c des.c, $ext_shared,, -DZEND_ENABLE_STATIC_TSRMLS_CACHE=1)
 ```
+
+des 源码来自  https://github.com/tarequeh/DES/
+密钥在 wumashi_password.c 文件里
+
+```
+//8位长度
+static const unsigned char DES_KEY[] = "12345678";
+```
+
+
+安装方式
+

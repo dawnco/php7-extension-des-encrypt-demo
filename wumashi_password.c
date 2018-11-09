@@ -100,8 +100,10 @@ PHPAPI zend_string *php_des_encode(unsigned char *str, size_t str_len){
 	
 	
 	while(block_count < number_of_blocks){
-		block_count ++;
+		
 		substr(data_block, str, 8, block_count * 8);
+		
+		block_count ++;
 		
 		if (block_count == number_of_blocks){
 			//最后一块
@@ -180,8 +182,10 @@ PHPAPI zend_string *php_des_decode(unsigned char *str, size_t str_len){
 	
 	
 	while(block_count < number_of_blocks){
-		block_count ++;
+		
 		substr(data_block, str, 8, block_count * 8);
+		
+		block_count ++;
 		
 		if (block_count == number_of_blocks){
 			//最后一块
@@ -191,6 +195,7 @@ PHPAPI zend_string *php_des_decode(unsigned char *str, size_t str_len){
 			//小于8 这个区域有填充
 			if (padding < 8) {
 				for (i= 0; i < 8 - padding; i++){
+					 
 					*p++ = processed_block[i];
 				}
 			}
@@ -206,8 +211,7 @@ PHPAPI zend_string *php_des_decode(unsigned char *str, size_t str_len){
 		
 		memset(data_block, 0, 8);
 	}
-	
-	*p++ = 'A'; 
+	 
     *p = '\0';
 
     efree(data_block);
