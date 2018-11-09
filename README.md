@@ -27,3 +27,8 @@ php.ini 里填加 添加扩展
 extension=wumashi_password.so
 ```
 
+测试
+```
+php test.php
+```
+
