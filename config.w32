@@ -1,13 +1,7 @@
-// $Id$
-// vim:ft=javascript
+ARG_ENABLE('wumashi_password', 'wumashi_password support', 'no');
 
-// If your extension references something external, use ARG_WITH
-// ARG_WITH("wumashi_password", "for wumashi_password support", "no");
+if (PHP_WUMASHI_PASSWORD != 'no') {
+        AC_DEFINE('HAVE_WUMASHI_PASSWORD', 1, 'wumashi_password support enabled');
 
-// Otherwise, use ARG_ENABLE
-ARG_ENABLE("wumashi_password", "enable wumashi_password support", "no");
-
-if (PHP_WUMASHI_PASSWORD != "no") {
-	EXTENSION("wumashi_password", "wumashi_password.c", PHP_EXTNAME_SHARED, "/DZEND_ENABLE_STATIC_TSRMLS_CACHE=1");
+        EXTENSION('wumashi_password', 'wumashi_password.c', null, '/DZEND_ENABLE_STATIC_TSRMLS_CACHE=1');
 }
-
